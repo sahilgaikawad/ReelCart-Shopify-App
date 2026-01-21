@@ -1,0 +1,266 @@
+{% comment %}
+  ReelCart Pro – Floating Player (Fully Customizable)
+{% endcomment %}
+
+<div id="rc-floating-player" class="rc-tiny-player" style="display:none;" onmousedown="initDrag(event)" ontouchstart="initDrag(event)">
+    <span class="rc-tiny-close" onclick="closeTinyPlayer(event)">×</span>
+    <div class="rc-tiny-video-wrapper" onclick="handleTinyClick(event)">
+        <video id="rc-tiny-video" muted autoplay loop playsinline></video>
+        <div class="rc-tiny-overlay"><span id="rc-overlay-text">Watch & Shop</span></div>
+        <div id="rc-sale-badge" class="rc-sale-badge" style="display:none;">SALE</div>
+    </div>
+</div>
+
+<div id="reel-cart-modal" class="rc-modal-overlay" style="display:none;">
+  <div class="rc-modal-content">
+    <span class="rc-close-btn" onclick="closeReelModal()">&times;</span>
+    <div class="rc-split-layout">
+      <div class="rc-product-side">
+        <div class="rc-product-card-inner">
+          <div class="rc-badge-new">FEATURED</div>
+          <img id="rc-modal-img" src="" alt="Product">
+          <h2 id="rc-modal-title">Product Title</h2>
+          <div class="rc-modal-price-row">
+            <span id="rc-modal-price" class="rc-main-price"></span>
+            <span id="rc-modal-compare" class="rc-compare-price"></span>
+          </div>
+          <div class="rc-benefits-box">
+            <p class="rc-benefit-item">✓ Premium Quality Guaranteed</p>
+          </div>
+          <button id="rc-modal-atc" class="rc-modal-buy-btn">ADD TO BAG</button>
+        </div>
+      </div>
+      <div class="rc-video-side">
+        <video id="rc-modal-video" controls autoplay loop playsinline></video>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.activeReelData = null;
+  window.appSettings = null; // Store global settings here
+  let isAtcPending = false;
+
+  // --- DRAG LOGIC ---
+  let dragActive = false;
+  let dragStartedAt = { x: 0, y: 0 };
+  let offset = { x: 0, y: 0 };
+  let wasDragged = false;
+
+  function initDrag(e) {
+    if (e.target.classList.contains('rc-tiny-close')) return;
+    dragActive = true;
+    wasDragged = false;
+    const player = document.getElementById('rc-floating-player');
+    const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+    const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+    dragStartedAt.x = clientX; dragStartedAt.y = clientY;
+    offset.x = clientX - player.getBoundingClientRect().left;
+    offset.y = clientY - player.getBoundingClientRect().top;
+    document.addEventListener('mousemove', handleDrag);
+    document.addEventListener('touchmove', handleDrag, { passive: false });
+    document.addEventListener('mouseup', stopDrag);
+    document.addEventListener('touchend', stopDrag);
+  }
+
+  function handleDrag(e) {
+    if (!dragActive) return;
+    const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+    const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+    if (Math.abs(clientX - dragStartedAt.x) > 5 || Math.abs(clientY - dragStartedAt.y) > 5) {
+      wasDragged = true;
+      if (e.type === 'touchmove') e.preventDefault();
+      const player = document.getElementById('rc-floating-player');
+      let left = clientX - offset.x;
+      let top = clientY - offset.y;
+      left = Math.max(10, Math.min(left, window.innerWidth - player.offsetWidth - 10));
+      top = Math.max(10, Math.min(top, window.innerHeight - player.offsetHeight - 10));
+      player.style.left = left + 'px';
+      player.style.top = top + 'px';
+      player.style.bottom = 'auto'; player.style.right = 'auto';
+      player.style.cursor = 'grabbing';
+    }
+  }
+
+  function stopDrag() {
+    dragActive = false;
+    document.getElementById('rc-floating-player').style.cursor = 'grab';
+    document.removeEventListener('mousemove', handleDrag);
+    document.removeEventListener('touchmove', handleDrag);
+  }
+
+  function handleTinyClick(e) {
+    if (wasDragged) return; 
+    if (window.activeReelData) window.openReelModal(window.activeReelData);
+  }
+
+  window.closeTinyPlayer = function(e) {
+    e.preventDefault(); e.stopPropagation();
+    const player = document.getElementById('rc-floating-player');
+    const s = window.appSettings || {};
+    // Minimize logic check
+    if (s.minimizeOnClose) {
+        player.classList.add('rc-minimized'); // You can add CSS for this later
+        player.style.display = 'none'; // Temporarily hiding for now
+    } else {
+        player.remove();
+    }
+  }
+
+  // --- INIT & DYNAMIC STYLING ---
+  async function initGlobalReel() {
+    const shop = "{{ shop.permanent_domain }}";
+    const pId = "{{ product.id }}"; 
+    let fetchUrl = `/apps/reel-data?shop=${shop}`;
+    if (pId && pId !== "" && pId !== "null") fetchUrl += `&productId=gid://shopify/Product/${pId}`;
+
+    try {
+      const res = await fetch(fetchUrl + '&v=' + Date.now());
+      const data = await res.json();
+      const settings = data.settings || {};
+      window.appSettings = settings;
+
+      // 1. Check Visibility Rules
+      if (!settings.floatingPlayerVisible) return;
+      
+      // 2. Mobile Logic
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile && settings.hideOnMobile) return;
+
+      let activeReel = data.reel || (data.reels && data.reels[0]);
+      if (activeReel) {
+          window.activeReelData = activeReel;
+          const player = document.getElementById('rc-floating-player');
+          const video = document.getElementById('rc-tiny-video');
+          const overlayText = document.getElementById('rc-overlay-text');
+          const saleBadge = document.getElementById('rc-sale-badge');
+          
+          video.src = activeReel.videoUrl;
+          video.muted = settings.startMuted !== false; // Default true
+
+          // --- DYNAMIC STYLING ---
+          const width = settings.floatingSize || 150;
+          player.style.width = width + 'px';
+          player.style.height = (width * 1.6) + 'px';
+          
+          // Position Logic (Desktop vs Mobile)
+          const pos = isMobile ? (settings.mobilePosition || 'bottom-center') : (settings.floatingPosition || 'bottom-right');
+          applyPosition(player, pos);
+
+          // Borders & Colors
+          player.style.borderWidth = (settings.floatingBorderWidth || 2) + 'px';
+          player.style.borderColor = settings.floatingBorderColor || '#ffffff';
+          player.style.borderStyle = settings.borderStyle || 'solid';
+          
+          // Shadow
+          player.style.boxShadow = settings.enableShadow ? '0 15px 35px rgba(0,0,0,0.4)' : 'none';
+
+          // Text & Badge
+          if(overlayText) overlayText.innerText = settings.floatingOverlayText || 'Watch & Shop';
+          if(saleBadge && settings.showSaleBadge) saleBadge.style.display = 'block';
+
+          player.style.display = 'block';
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  function applyPosition(el, pos) {
+      el.style.top = 'auto'; el.style.bottom = 'auto'; el.style.left = 'auto'; el.style.right = 'auto';
+      el.style.transform = 'none';
+      
+      if (pos === 'bottom-left') { el.style.bottom = '30px'; el.style.left = '30px'; }
+      else if (pos === 'top-right') { el.style.top = '30px'; el.style.right = '30px'; }
+      else if (pos === 'top-left') { el.style.top = '30px'; el.style.left = '30px'; }
+      else if (pos === 'bottom-center') { 
+          el.style.bottom = '30px'; 
+          el.style.left = '50%'; 
+          el.style.transform = 'translateX(-50%)'; 
+      }
+      else if (pos === 'top-center') { 
+          el.style.top = '30px'; 
+          el.style.left = '50%'; 
+          el.style.transform = 'translateX(-50%)'; 
+      }
+      else { el.style.bottom = '30px'; el.style.right = '30px'; } // Default Bottom-Right
+  }
+
+  window.openReelModal = function(reel) {
+    const modal = document.getElementById('reel-cart-modal');
+    const s = window.appSettings || {};
+
+    document.getElementById('rc-modal-img').src = reel.productImage;
+    document.getElementById('rc-modal-title').innerText = reel.productTitle;
+    document.getElementById('rc-modal-price').innerText = "Rs. " + reel.price;
+    document.getElementById('rc-modal-video').src = reel.videoUrl;
+    
+    // Update Button Color from Global Settings
+    const btn = document.getElementById('rc-modal-atc');
+    btn.style.backgroundColor = s.primaryColor || '#000';
+    btn.style.color = s.buttonTextColor || '#fff';
+    btn.innerText = s.buttonText || "ADD TO BAG";
+    btn.onclick = () => addToCart(reel.variantId);
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    document.getElementById('rc-modal-video').play();
+  }
+
+  async function addToCart(vId) {
+    if (isAtcPending) return;
+    isAtcPending = true;
+    try {
+      await fetch('/cart/add.js', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({items: [{id: parseInt(vId), quantity: 1}]})
+      });
+      window.location.href = '/checkout';
+    } catch (e) { console.error(e); }
+    finally { isAtcPending = false; }
+  }
+
+  window.closeReelModal = () => { 
+    document.getElementById('rc-modal-video').pause();
+    document.getElementById('reel-cart-modal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+  }
+
+  window.onclick = (e) => { if (e.target.id === 'reel-cart-modal') window.closeReelModal(); }
+  document.addEventListener('DOMContentLoaded', initGlobalReel);
+</script>
+
+<style>
+  .rc-tiny-player { position: fixed; z-index: 2147483646; border-radius: 12px; overflow: hidden; background: #000; user-select: none; touch-action: none; transition: transform 0.2s ease; }
+  .rc-tiny-video-wrapper { width: 100%; height: 100%; position: relative; }
+  #rc-tiny-video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+  .rc-tiny-close { position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); color: #fff; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 22px; z-index: 2147483647; cursor: pointer; font-weight: bold; border: 1px solid rgba(255,255,255,0.3); font-size: 16px; }
+  .rc-tiny-overlay { position: absolute; bottom: 0; width: 100%; background: linear-gradient(transparent, rgba(0,0,0,0.9)); color: #fff; font-size: 11px; text-align: center; padding: 10px 0; font-weight: bold; text-transform: uppercase; }
+  .rc-sale-badge { position: absolute; top: 10px; left: 10px; background: #ff0000; color: white; padding: 2px 6px; font-size: 10px; border-radius: 4px; font-weight: bold; z-index: 2; }
+
+  /* MODAL */
+  .rc-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 2147483647; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .rc-modal-content { background: #fff; width: 100%; max-width: 900px; border-radius: 20px; overflow: hidden; position: relative; font-family: sans-serif; display: flex; flex-direction: column; }
+  .rc-close-btn { position: absolute; right: 20px; top: 15px; font-size: 30px; cursor: pointer; color: #333; z-index: 10; }
+  .rc-split-layout { display: flex; height: 70vh; max-height: 600px; }
+  .rc-product-side { flex: 1; padding: 30px; overflow-y: auto; background: #fff; display: flex; align-items: center; justify-content: center; }
+  .rc-product-card-inner { text-align: left; width: 100%; max-width: 350px; }
+  .rc-product-card-inner img { width: 100%; border-radius: 12px; margin-bottom: 20px; border: 1px solid #eee; }
+  #rc-modal-title { font-size: 22px; margin: 0 0 10px; color: #333; }
+  .rc-main-price { font-size: 20px; font-weight: bold; color: #333; }
+  .rc-modal-buy-btn { width: 100%; border: none; padding: 16px; font-weight: bold; cursor: pointer; border-radius: 8px; margin-top: 20px; transition: opacity 0.2s; }
+  .rc-modal-buy-btn:hover { opacity: 0.9; }
+  .rc-video-side { flex: 0.8; background: #000; display: flex; align-items: center; justify-content: center; }
+  .rc-video-side video { width: 100%; height: 100%; object-fit: contain; }
+  
+  @media (max-width: 768px) {
+    .rc-split-layout { flex-direction: column-reverse; height: auto; max-height: 90vh; }
+    .rc-video-side { height: 350px; flex: none; }
+    .rc-product-side { padding: 20px; }
+    .rc-tiny-player { width: 110px !important; height: 180px !important; }
+  }
+</style>
+
+{% schema %}
+{ "name": "ReelCart Embed", "target": "body", "settings": [] }
+{% endschema %}

@@ -1,0 +1,134 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+// 👇 YAHAN CHANGE KIYA HAI (Session Model)
+model Session {
+  id          String    @id
+  shop        String
+  state       String
+  isOnline    Boolean   @default(false)
+  scope       String?
+  expires     DateTime?
+  accessToken String
+  userId      BigInt?
+  firstName   String?
+  lastName    String?
+  email       String?
+  accountOwner Boolean   @default(false)
+  locale      String?
+  collaborator Boolean?  @default(false)
+  emailVerified Boolean? @default(false)
+
+  // 🔥 YE DONO LINES ADD KARNA ZAROORI HAI 👇
+  refreshToken String?
+  refreshTokenExpires DateTime?
+}
+
+// Reel Model (Ye sahi hai, isme koi change nahi)
+model Reel {
+  id            Int      @id @default(autoincrement())
+  shop          String
+  videoUrl      String
+  
+  productId     String?  
+  variantId     String?
+  productHandle String?
+  
+  productTitle  String?
+  productImage  String?
+  brandName     String?  @default("Official Brand")
+  price         String?  
+  comparePrice  String?  
+  
+  likes         Int      @default(0)
+  
+  // --- VIEWS LOGIC ---
+  views         Int      @default(0)
+  boostViews    Int      @default(0)
+
+  rating        String?  @default("4.8")
+  
+  // Content Management
+  source        String?  @default("manual") 
+  isLive        Boolean  @default(false)  
+  instagramUrl  String?  
+  instagramId   String?  @unique 
+  
+  createdAt     DateTime @default(now())
+}
+
+// AppSettings Model (Ye bhi sahi hai)
+model AppSettings {
+  id             Int     @id @default(autoincrement())
+  shop           String  @unique
+  
+  instagramToken String? 
+  autoSync       Boolean @default(false)
+  
+  // Branding
+  primaryColor    String   @default("#000000")
+  buttonTextColor String   @default("#ffffff")
+  buttonText      String   @default("Add to Bag") 
+  customFont      String   @default("inherit")
+  
+  cartAction      String   @default("ajax")
+
+  // Floating Player
+  floatingPlayerVisible Boolean @default(true) 
+  displayLocation       String  @default("both")
+  
+  floatingSize          Int     @default(150)
+  floatingPosition      String  @default("bottom-right")
+  floatingBorderWidth   Int     @default(2)
+  floatingBorderColor   String  @default("#ffffff")
+  floatingOverlayText   String  @default("Watch & Shop")
+  
+  hideOnMobile      Boolean @default(false)
+  mobilePosition    String  @default("bottom-center")
+  enableShadow      Boolean @default(true)
+  borderStyle       String  @default("solid")
+  buttonAnimation   String  @default("none")
+  showSaleBadge     Boolean @default(false)
+  startMuted        Boolean @default(true)
+  minimizeOnClose   Boolean @default(true)
+
+  // Home Widget
+  widgetLayout          String  @default("slider")
+  widgetAspectRatio     String  @default("9:16")
+  
+  cardWidth             Int     @default(250)
+  sectionPadding        Int     @default(20)
+  sectionRadius         Int     @default(0)
+  itemsPerRow           Int     @default(4)
+  
+  widgetHeading         String  @default("Trending Reels")
+  widgetHeadingColor    String  @default("#000000")
+  widgetBackgroundColor String  @default("transparent") 
+  cardBackgroundColor   String  @default("#ffffff")      
+  
+  widgetCornerRadius    Int     @default(12)        
+  widgetGap             Int     @default(16)        
+  showProductDetails    Boolean @default(true)      
+  
+  productTitleColor     String  @default("#333333")
+  productPriceColor     String  @default("#666666")
+  productTextSize       Int     @default(14)        
+
+  showViews       Boolean  @default(true) 
+  showRating      Boolean  @default(true)
+  autoplay        Boolean  @default(true)
+  borderRadius    Int      @default(12) 
+  layoutType      String   @default("slider") 
+  enableGradient  Boolean  @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
